@@ -22,7 +22,7 @@
       state_files_path: "{{ state_files.path }}"
 
 - name: Ensure F5 BigIP system readiness
-  hosts: f5node
+  hosts: tag_kind_f5node
   connection: local
   gather_facts: false
   tasks:
@@ -43,7 +43,7 @@
         validate_certs: no
 
 - name: Perform 8-Ball AI Rolling Update
-  hosts: web # workers
+  hosts: tag_kind_worker
   serial: 1
   tasks:
 

@@ -2,4 +2,5 @@ tmp
 .DS_Store
 kubeconfig.tmp
 *.bak
+vars/
 
