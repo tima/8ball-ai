@@ -1,0 +1,100 @@
+---
+- name: Fetching state files from Git.
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+  - name: Create temporary directory for state files.
+    tempfile:
+      state: directory
+      suffix: ".8ballcfg"
+    register: state_files
+
+  - name: Retreiving state files.
+    git:
+      repo: 'https://github.com/tima/8ball-ai-config-prod'
+      dest: "{{ state_files.path }}"
+      depth: 1
+    register: git_response
+
+  - name: Stashing state files path.
+    set_fact:
+      state_files_path: "{{ state_files.path }}"
+
+- name: Ensure F5 BigIP system readiness
+  hosts: f5node
+  connection: local
+  gather_facts: false
+  tasks:
+
+  - include_vars:
+      file: "{{ hostvars['localhost'].state_files_path }}/config.yaml"
+
+  - name: Create F5 BigIP {{ bigip_pool_name }} pool
+    bigip_pool:
+      state: present
+      name: "{{ bigip_pool_name }}"
+      partition: Common
+      lb_method: least-connections-member
+      slow_ramp_time: 120
+      provider:
+        server: "{{ bigip_server }}"
+        server_port: "{{ bigip_server_port }}"
+        validate_certs: no
+
+- name: Perform 8-Ball AI Rolling Update
+  hosts: web # workers
+  serial: 1
+  tasks:
+
+  - include_vars:
+      file: "{{ hostvars['localhost'].state_files_path }}/config.yaml"
+
+  - name: Remove {{ inventory_hostname }} from pool
+    bigip_pool_member:
+      state: absent
+      pool: "{{ bigip_pool_name }}"
+      partition: Common
+      host: "{{ ansible_default_ipv4['address'] }}"
+      name: "{{ inventory_hostname }}"
+      port: 80
+      provider:
+        server: "{{ bigip_server }}"
+        server_port: "{{ bigip_server_port }}"
+        validate_certs: no
+    delegate_to: localhost
+
+  - name: Apply state on {{ inventory_hostname }}
+    become: true
+    block:
+    - name: Install required RPM GPG keys
+      rpm_key:
+        state: present
+        key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-8
+
+    - name: Assure EPEL repo enabled
+      dnf:
+        name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm"
+        state: present
+
+    - name: Update essential services
+      yum:
+        name: cowsay
+        state: latest
+
+  - name: Add pool member
+    bigip_pool_member:
+      pool: "{{ bigip_pool_name }}"
+      partition: Common
+      host: "{{ ansible_default_ipv4['address'] }}"
+      port: 80
+      name: "{{ inventory_hostname }}"
+      description: "8Ball-AI Worker Node running 8ball-{{ eightball_service_version }}"
+      connection_limit: 100
+      rate_limit: 50
+      ratio: 2
+      provider:
+        server: "{{ bigip_server }}"
+        server_port: "{{ bigip_server_port }}"
+        validate_certs: no
+    delegate_to: localhost
