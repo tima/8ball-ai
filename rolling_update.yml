@@ -43,23 +43,23 @@
         validate_certs: no
 
 - name: Perform 8-Ball AI Rolling Update
-  hosts: tag_kind_worker
+  hosts: tag_kind_8ball
   serial: 1
   tasks:
 
   - include_vars:
       file: "{{ hostvars['localhost'].state_files_path }}/config.yaml"
 
-  - name: HACK to add {{ inventory_hostname }} as node if it isn't one already
-    bigip_node:
-      host: "{{ ansible_default_ipv4['address'] }}"
-      # port: 80
-      name: "{{ inventory_hostname }}"
-      provider:
-        server: "{{ bigip_server }}"
-        server_port: "{{ bigip_server_port }}"
-        validate_certs: no
-    delegate_to: localhost
+  # - name: HACK to add {{ inventory_hostname }} as node if it isn't one already
+  #   bigip_node:
+  #     host: "{{ ansible_default_ipv4['address'] }}"
+  #     # port: 80
+  #     name: "{{ inventory_hostname }}"
+  #     provider:
+  #       server: "{{ bigip_server }}"
+  #       server_port: "{{ bigip_server_port }}"
+  #       validate_certs: no
+  #   delegate_to: localhost
 
   - name: Remove {{ inventory_hostname }} from pool
     bigip_pool_member:
